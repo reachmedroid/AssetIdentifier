@@ -8,17 +8,23 @@ import pytesseract
 from fpdf import FPDF
 from io import BytesIO
 import textwrap
+from tavily import TavilyClient
 
 # -- SETTINGS & INIT --
-st.set_page_config(page_title="Asset Identifier Bot", layout="wide")
-st.title("📄 Assets Identification Bot (AIB)")
-st.markdown("Upload your architecture diagrams and asset list—get AI-powered insights!")
+st.set_page_config(page_title="GuardianAssets AI", layout="wide")
+st.title("📄 GuardianAssets AI - AI Powered Security Bot")
+st.markdown("Upload Architecture Diagrams and get AI-Powered Security Requirements!")
+
+# ---
+client_tavily = TavilyClient("tvly-dev-xxxxxxxx")
+
+
 
 # --- Sidebar: API Key & Platform Selection ---
 st.sidebar.header("🔧 Settings")
 user_api_key = st.sidebar.text_input("🔑 Enter your OpenAI API Key", type="password")
 cloud_choice = st.sidebar.radio("Choose Cloud Provider:", ["AWS", "Azure", "GCP"], horizontal=True)
-uploaded_file_kb = st.sidebar.file_uploader("📁 Upload your CSV file (asset inventory)", type=["csv"])
+uploaded_file_kb = st.sidebar.file_uploader("📁 Upload custom datasheet [RAG] file based on choice of cloud", type=["csv"])
 
 if not user_api_key:
     st.sidebar.warning("Please enter your OpenAI API key.")
@@ -101,6 +107,17 @@ def create_pdf(text):
     pdf_bytes.seek(0)  # Reset buffer pointer
     return pdf_bytes
 
+def web_search(text):
+    response = client_tavily.search(
+        query=f"{text}",max_results=10
+    )
+    content = ""
+    for r in response.get('results'):
+        content +=r['content']
+
+    return content
+
+tab1, tab2, tab3 = st.tabs(["📊 Cloud Assets", "📁 Current News ", "⚙️ Security Requirements "])
 
 if image_text and uploaded_file_kb:
     top_chunks = query_collection(collection, image_text, client)
@@ -109,12 +126,13 @@ if image_text and uploaded_file_kb:
         with st.spinner("Identification in progress..."):
             prompt = f"As a expert {cloud_choice} architect,list down the cloud resources only for {cloud_choice} along with the description."
             identified_resources = ask_chatgpt("\n".join(top_chunks), prompt, cloud_choice, client)
-            st.write(identified_resources)
-            pdf_bytes = create_pdf(identified_resources)
-            #st.write(pdf_bytes)
-            st.download_button(
-                    label="⬇️ Download PDF",
-                    data=pdf_bytes,
-                    file_name="cloud_resources_response.pdf",
-                    mime="application/pdf"
-                )
+            with tab1:
+                st.write(identified_resources)
+                pdf_bytes = create_pdf(identified_resources)
+                #st.write(pdf_bytes)
+                st.download_button(
+                        label="⬇️ Download PDF",
+                        data=pdf_bytes,
+                        file_name="cloud_resources_response.pdf",
+                        mime="application/pdf"
+                    )
